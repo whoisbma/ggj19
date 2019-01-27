@@ -31,7 +31,6 @@ const game = new Phaser.Game({
 
 let items;
 let itemsOnBoard = [];
-let itemsToCheck = [];
 let cursor;
 let occupiedGrid = [];
 let occupiedGridGraphic = [];
@@ -198,7 +197,7 @@ function killItemAtXY(x, y) {
     item.destroy();
     itemsOnBoard[x][y] = false;
     occupiedGridGraphic[x][y].setTint(0xff00ff);
-    spawnMissingItems();
+    shiftDisplacedItems();
   });
 }
 
@@ -213,8 +212,8 @@ function getPositionFromXY(x, y) {
   }
 }
 
-function spawnMissingItems() {
-  itemsToCheck = [];
+function shiftDisplacedItems() {
+  let totalDisplacedItems = [];
   let dir = 0; // 0 top, 1 right, 2 down, 3 left ( FROM DIRECTION ) 
 
   let PERP_DIR, LANE_DIR, INCR;
@@ -237,7 +236,8 @@ function spawnMissingItems() {
         } 
       } else {
         if (emptyStart !== -1) {
-          shiftAtPosByAmount(i, j, emptyStart - j, dir);
+          let displacedItemsAtRow = shiftAtPosByAmount(i, j, emptyStart - j, dir);
+          totalDisplacedItems = totalDisplacedItems.concat(displacedItemsAtRow);
           j = emptyStart ;
           emptyStart = -1;
         }
@@ -245,16 +245,27 @@ function spawnMissingItems() {
     }
   }
 
-  itemsToCheck.forEach((item, i) => {
+  let matches = [];
+  totalDisplacedItems.forEach((item, i) => {
     item.setTint(0x00ff00);
-    const matches = getMatchesAtPosition(item.posX, item.posY, getItemColor(item));
-    // handleMatches(matches);
-    // item.setTint(0xffffff);
+    let theseMatches = getMatchesAtPosition(item.posX, item.posY, getItemColor(item));
+    if (theseMatches.length > 2) {
+      matches = matches.concat(getMatchesAtPosition(item.posX, item.posY, getItemColor(item)));
+    }
   });
-
+  let filteredMatches = [];
+  matches.forEach((item, i) => {
+    if (!filteredMatches.includes(item)) {
+      filteredMatches.push(item);
+    }
+  });
+  // if (filteredMatches.length > 2) {
+  handleMatches(filteredMatches);    
+  // }
 }
 
 function shiftAtPosByAmount(x, y, amt, dir) {
+  let displacedItems = [];
   if (dir === 0) {
     for (let yy = y; yy >= 0; yy--) {
       // console.log('move at', x, yy, 'by', amt);
@@ -263,45 +274,51 @@ function shiftAtPosByAmount(x, y, amt, dir) {
       if (!itemToMove) {
         itemsOnBoard[x][targetY] = false;
         occupiedGridGraphic[x][targetY].setTint(0xff00ff);
-        continue;
-      }
-      itemToMove.posY = targetY;
-      let targetPos = getPositionFromXY(x, targetY);
-      itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
-      itemsOnBoard[x][targetY] = true;
-      occupiedGridGraphic[x][targetY].setTint(0xffff00);
-      itemsToCheck.push(itemToMove);
+      } else {
+        itemToMove.posY = targetY;
+        let targetPos = getPositionFromXY(x, targetY);
+        itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
+        itemsOnBoard[x][targetY] = true;
+        occupiedGridGraphic[x][targetY].setTint(0xffff00);
+        displacedItems.push(itemToMove);
 
-      tweenItemPos(itemToMove, targetPos.x, targetPos.y, () => {});
+        tweenItemPos(itemToMove, targetPos.x, targetPos.y, () => {itemToMove.setTint(0xffffff);});        
+      }
     }
 
     for (let y = 0; y < amt; y++) {
       itemsOnBoard[x][y] = false;
       occupiedGridGraphic[x][y].setTint(0xff00ff);
     }
-
   }
+
+  return displacedItems;
 }
 
 function handleMatches(matches) {
+  console.log('handling matches!');
   let matchesToDestroy = [];
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
       let matchToDestroy = items.getChildren().find((item) => item.id === matches[i]);
       if (matchToDestroy) {    
         matchesToDestroy.push(matchToDestroy);
+        let pos = getItemXYFromId(matchesToDestroy[i].id);
+        itemsOnBoard[pos.x][pos.y] = false;
+        occupiedGridGraphic[pos.x][pos.y].setTint(0xff00ff);
       }
     }
   }
 
   tweenDelete(matchesToDestroy, () => {
+    let numDeleted = 0;
     for (let i = 0; i < matchesToDestroy.length; i++) {
-      let pos = getItemXYFromId(matchesToDestroy[i].id);
-      itemsOnBoard[pos.x][pos.y] = false;
-      occupiedGridGraphic[pos.x][pos.y].setTint(0xff00ff);
+      numDeleted++;
       matchesToDestroy[i].destroy();
     }
-    spawnMissingItems();
+    if (numDeleted > 0) {
+      shiftDisplacedItems();      
+    }
   });
 }
 
@@ -363,7 +380,7 @@ function tweenDelete(item, callback) {
     targets: item,
     scaleX: 0,
     scaleY: 0,
-    duration: 250,
+    duration: 1000,
     ease: 'Power2',
     delay: 600,
     onComplete: callback,
@@ -376,7 +393,7 @@ function tweenItemPos(item, newPosX, newPosY, callback) {
     targets: item,
     x: newPosX,
     y: newPosY,
-    duration: 500,
+    duration: 1000,
     ease: 'Power2',
     onComplete: callback,
   });
