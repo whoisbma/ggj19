@@ -97,9 +97,9 @@ function create() {
       alpha: 0.5
     },
   });
-  cursor.fillRect(0, 0, 96, 96);
-  cursor.generateTexture('block', 96, 96);
-  let highlighted = this.add.image(96, 96, 'block');
+  cursor.fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  cursor.generateTexture('block', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  let highlighted = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'block');
   highlighted.setDepth(-1);
 
   this.input.on('pointerover', (pointer, gameObjects) => {
@@ -154,9 +154,7 @@ function swapPosition(item1, item2) {
       tweenItemPos(item1, newPos[0], newPos[1], () => {});
       tweenItemPos(item2, item1.x, item1.y, () => {});
     } else {
-      handleMatches(matches1);
-      handleMatches(matches2);
-      spawnMissingItems();
+      handleMatches(matches1.concat(matches2)); 
     }
   };
 
@@ -186,9 +184,12 @@ function shiftAtPosByAmount(x, y, amt, dir) {
 function killItemAtXY(x, y) {
   let item = getItemByCoord(x, y);
   if (!item) return;
-  item.destroy();
-  itemsOnBoard[x][y] = false;
-  spawnMissingItems();
+
+  tweenDelete(item, () => {
+    item.destroy();
+    itemsOnBoard[x][y] = false;
+    spawnMissingItems();
+  });
 }
 
 function getPositionFromXY(x, y) {
@@ -236,16 +237,24 @@ function spawnMissingItems() {
 }
 
 function handleMatches(matches) {
+  let matchesToDestroy = [];
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
       let matchToDestroy = items.getChildren().find((item) => item.id === matches[i]);
-      if (matchToDestroy) {
-        let pos = getItemXYFromId(matchToDestroy.id);
-        itemsOnBoard[pos.x][pos.y] = false;
-        matchToDestroy.destroy();
+      if (matchToDestroy) {    
+        matchesToDestroy.push(matchToDestroy);
       }
     }
   } 
+
+  tweenDelete(matchesToDestroy, () => {
+    for (let i = 0; i < matchesToDestroy.length; i++) {
+      let pos = getItemXYFromId(matchesToDestroy[i].id);
+      itemsOnBoard[pos.x][pos.y] = false;
+      matchesToDestroy[i].destroy();      
+    }
+    spawnMissingItems();    
+  });
 }
 
 function getItemColor(item) {
@@ -299,6 +308,17 @@ function getMatchesAtPosition(x, y, color, opt_results) {
     }
   }
   return results;
+}
+
+function tweenDelete(item, callback) {
+  return game.scene.scenes[0].tweens.add({
+    targets: item,
+    scaleX: 0,
+    scaleY: 0,
+    duration: 250,
+    ease: 'Power2',
+    onComplete: callback,
+  });
 }
 
 function tweenItemPos(item, newPosX, newPosY, callback) {
