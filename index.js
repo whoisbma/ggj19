@@ -42,6 +42,8 @@ function preload() {
   this.load.image('oilbottle', './assets/oilbottle.png');
   this.load.image('plant', './assets/plant.png');
   this.load.image('scissors', './assets/scissors.png');
+  this.load.image('bodegacup', './assets/bodegacup.png');
+  this.load.image('calculator', './assets/calculator.png');
 }
 
 function create() {
@@ -56,7 +58,7 @@ function create() {
     occupiedGridGraphic[i] = [];
     for (let j = 0; j < ROWS; j++) {
       itemsOnBoard[i][j] = true;
-      let r = Phaser.Math.Between(0, 3);
+      let r = Phaser.Math.Between(0, 5);
       let item;
       const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
       const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
@@ -78,6 +80,7 @@ function create() {
       occupiedGridGraphic[i][j].setPosition(x, y);
       occupiedGridGraphic[i][j].setDepth(-10);
       occupiedGridGraphic[i][j].setTint(0xffff00);
+      occupiedGridGraphic[i][j].visible = false;
 
       switch (Math.floor(r)) {
         case 0:
@@ -96,6 +99,13 @@ function create() {
           item = items.create(x, y, 'scissors');
           item.category = 3;
           break;
+        case 4:
+          item = items.create(x, y, 'bodegacup');
+          item.category = 4;
+          break;
+        case 5:
+          item = items.create(x, y, 'calculator');
+          item.category = 5;
         default:
           break;
       }
@@ -247,7 +257,7 @@ function shiftDisplacedItems() {
 
   let matches = [];
   totalDisplacedItems.forEach((item, i) => {
-    item.setTint(0x00ff00);
+    // item.setTint(0x00ff00);
     let theseMatches = getMatchesAtPosition(item.posX, item.posY, getItemColor(item));
     if (theseMatches.length > 2) {
       matches = matches.concat(getMatchesAtPosition(item.posX, item.posY, getItemColor(item)));
@@ -296,7 +306,7 @@ function shiftAtPosByAmount(x, y, amt, dir) {
 }
 
 function handleMatches(matches) {
-  console.log('handling matches!');
+  // console.log('handling matches!');
   let matchesToDestroy = [];
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
@@ -380,7 +390,7 @@ function tweenDelete(item, callback) {
     targets: item,
     scaleX: 0,
     scaleY: 0,
-    duration: 1000,
+    duration: 250,
     ease: 'Power2',
     delay: 600,
     onComplete: callback,
@@ -393,7 +403,7 @@ function tweenItemPos(item, newPosX, newPosY, callback) {
     targets: item,
     x: newPosX,
     y: newPosY,
-    duration: 1000,
+    duration: 500,
     ease: 'Power2',
     onComplete: callback,
   });
