@@ -31,7 +31,10 @@ const game = new Phaser.Game({
 
 let items;
 let itemsOnBoard = [];
+let itemsToCheck = [];
 let cursor;
+let occupiedGrid = [];
+let occupiedGridGraphic = [];
 let selectedItem = null;
 
 function preload() {
@@ -50,6 +53,8 @@ function create() {
 
   for (let i = 0; i < COLS; i++) {
     itemsOnBoard[i] = [];
+    occupiedGrid[i] = [];
+    occupiedGridGraphic[i] = [];
     for (let j = 0; j < ROWS; j++) {
       itemsOnBoard[i][j] = true;
       let r = Phaser.Math.Between(0, 3);
@@ -58,6 +63,23 @@ function create() {
       const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
       const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
       const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
+
+      occupiedGrid[i][j] = this.make.graphics({
+        x: x,
+        y: y, 
+        add: false,
+        fillStyle: {
+          color: 0xffffff,
+          alpha:1,
+        },
+      });
+      occupiedGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      occupiedGrid[i][j].generateTexture('debugblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      occupiedGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'debugblock');
+      occupiedGridGraphic[i][j].setPosition(x, y);
+      occupiedGridGraphic[i][j].setDepth(-10);
+      occupiedGridGraphic[i][j].setTint(0xffff00);
+
       switch (Math.floor(r)) {
         case 0:
           item = items.create(x, y, 'oilbottle');
@@ -175,6 +197,7 @@ function killItemAtXY(x, y) {
   tweenDelete(item, () => {
     item.destroy();
     itemsOnBoard[x][y] = false;
+    occupiedGridGraphic[x][y].setTint(0xff00ff);
     spawnMissingItems();
   });
 }
@@ -191,6 +214,7 @@ function getPositionFromXY(x, y) {
 }
 
 function spawnMissingItems() {
+  itemsToCheck = [];
   let dir = 0; // 0 top, 1 right, 2 down, 3 left ( FROM DIRECTION ) 
 
   let PERP_DIR, LANE_DIR, INCR;
@@ -206,7 +230,6 @@ function spawnMissingItems() {
     // when you find an empty spot, start keeping track.
     // the next time you find a full spot, move it down.
     let emptyStart = -1;
-    // let accum = 0;
     for (let j = itemsOnBoard[0].length - 1; j >= 0; --j) {
       if (!itemsOnBoard[i][j]) {
         if (emptyStart === -1) {
@@ -222,7 +245,13 @@ function spawnMissingItems() {
     }
   }
 
-  // TODO: check for new matches HERE
+  itemsToCheck.forEach((item, i) => {
+    item.setTint(0x00ff00);
+    const matches = getMatchesAtPosition(item.posX, item.posY, getItemColor(item));
+    // handleMatches(matches);
+    // item.setTint(0xffffff);
+  });
+
 }
 
 function shiftAtPosByAmount(x, y, amt, dir) {
@@ -233,15 +262,24 @@ function shiftAtPosByAmount(x, y, amt, dir) {
       let itemToMove = getItemByCoord(x, yy);
       if (!itemToMove) {
         itemsOnBoard[x][targetY] = false;
+        occupiedGridGraphic[x][targetY].setTint(0xff00ff);
         continue;
       }
       itemToMove.posY = targetY;
       let targetPos = getPositionFromXY(x, targetY);
-      tweenItemPos(itemToMove, itemToMove.x, targetPos.y, () => {});
-
       itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
-      itemsOnBoard[x][targetY] = true;      
+      itemsOnBoard[x][targetY] = true;
+      occupiedGridGraphic[x][targetY].setTint(0xffff00);
+      itemsToCheck.push(itemToMove);
+
+      tweenItemPos(itemToMove, targetPos.x, targetPos.y, () => {});
     }
+
+    for (let y = 0; y < amt; y++) {
+      itemsOnBoard[x][y] = false;
+      occupiedGridGraphic[x][y].setTint(0xff00ff);
+    }
+
   }
 }
 
@@ -254,15 +292,16 @@ function handleMatches(matches) {
         matchesToDestroy.push(matchToDestroy);
       }
     }
-  } 
+  }
 
   tweenDelete(matchesToDestroy, () => {
     for (let i = 0; i < matchesToDestroy.length; i++) {
       let pos = getItemXYFromId(matchesToDestroy[i].id);
       itemsOnBoard[pos.x][pos.y] = false;
-      matchesToDestroy[i].destroy();      
+      occupiedGridGraphic[pos.x][pos.y].setTint(0xff00ff);
+      matchesToDestroy[i].destroy();
     }
-    spawnMissingItems();    
+    spawnMissingItems();
   });
 }
 
@@ -300,8 +339,7 @@ function getMatchesAtPosition(x, y, color, opt_results) {
       if (color === getItemColor(item)) {
         if (!results.includes(item.id)) {
           results.push(item.id);
-          results.concat(getMatchesAtPosition(i, y, color, results));   
-          // TODO: figure out why when i assigned results.concat, it started not working. same below.
+          results = getMatchesAtPosition(i, y, color, results);
         } 
       }
     }
@@ -312,7 +350,7 @@ function getMatchesAtPosition(x, y, color, opt_results) {
       if (color === getItemColor(item)) { 
         if (!results.includes(item.id)) {
           results.push(item.id);
-          results.concat(getMatchesAtPosition(x, j, color, results));
+          results = getMatchesAtPosition(x, j, color, results);
         }
       }
     }
