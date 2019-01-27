@@ -29,18 +29,11 @@ const game = new Phaser.Game({
   },
 });
 
-let gems;
+let items;
 let cursor;
-let selectedGem = null;
-// let local = 'http://localhost:8000/';
-// let github = 'https://git.bryan.ma/ggj19/';
+let selectedItem = null;
 
 function preload() {
-  // this.load.setBaseURL(local);
-
-  // this.load.crossOrigin = 'anonymous'
-  // this.load.setCORS('https://git.bryan.ma/ggj19/');
-
   this.load.image('background', './assets/background.jpg');
   this.load.image('book', './assets/book.png');
   this.load.image('oilbottle', './assets/oilbottle.png');
@@ -52,53 +45,43 @@ function create() {
   bg = this.add.image(400, 400, 'background');
   bg.setDepth(-10);
   bg.setDisplaySize(800, 800);
-  gems = this.add.group();
+  items = this.add.group();
 
   for (let i = 0; i < COLS; i++) {
     for (let j = 0; j < ROWS; j++) {
       let r = Phaser.Math.Between(0, 3);
-      let gem;
+      let item;
       const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
       const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
       const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
       const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
       switch (Math.floor(r)) {
         case 0:
-          gem = gems.create(x, y, 'oilbottle');
-          gem.category = 0;
+          item = items.create(x, y, 'oilbottle');
+          item.category = 0;
           break;
         case 1:
-          gem = gems.create(x, y, 'book');
-          gem.category = 1;
+          item = items.create(x, y, 'book');
+          item.category = 1;
           break;
         case 2:
-          gem = gems.create(x, y, 'plant');
-          gem.category = 2;
+          item = items.create(x, y, 'plant');
+          item.category = 2;
           break;
         case 3:
-          gem = gems.create(x, y, 'scissors');
-          gem.category = 3;
+          item = items.create(x, y, 'scissors');
+          item.category = 3;
           break;
         default:
           break;
       }
       
-      gem.setScale(ITEM_SCALE, ITEM_SCALE);
-      gem.setInteractive();
-      gem.posX = i;
-      gem.posY = j;
-      gem.id = getGemId(i, j);
-      gem.name = 'gem' + i.toString() + 'x' + j.toString();
-
-      // gem.on('pointerdown', selectGem);
-      // gem.on('pointerup', releaseGem);
-      // gem.on('pointerout', releaseGem);
-
-      // gem.
-      // console.log(gem);
-      // gem.frame = Phaser.Math.Between(0, 4);
-      // gem.destroy();
-
+      item.setScale(ITEM_SCALE, ITEM_SCALE);
+      item.setInteractive();
+      item.posX = i;
+      item.posY = j;
+      item.id = getItemIdFromXY(i, j);
+      item.name = 'item' + i.toString() + 'x' + j.toString();
     }
   }
 
@@ -121,66 +104,66 @@ function create() {
   });
 
   this.input.on('pointerdown', (pointer, gameObjects) => {
-    // if its part of gems group,
-    if (gems.children.entries.indexOf(gameObjects[0]) > -1) {
-      selectedGem = gameObjects[0];
-      selectedGem.setTint(0x333333);
+    // if its part of items group,
+    if (items.children.entries.indexOf(gameObjects[0]) > -1) {
+      selectedItem = gameObjects[0];
+      selectedItem.setTint(0x333333);
     }
   });
 
   this.input.on('pointerup', (pointer, gameObjects) => {
-    if (selectedGem !== null) {
+    if (selectedItem !== null) {
       if (gameObjects.length > 0) {
-        const swappedGem = gameObjects[0];
-        if (isAdjacent(swappedGem, selectedGem)) {
-          swapPosition(selectedGem, swappedGem);
+        const swappedItem = gameObjects[0];
+        if (isAdjacent(swappedItem, selectedItem)) {
+          swapPosition(selectedItem, swappedItem);
         }
       }
-    selectedGem.clearTint();
-    selectedGem = null;
+    selectedItem.clearTint();
+    selectedItem = null;
     } 
   });
 }
 
-function swapPosition(gem1, gem2) {
-  let newPos = [gem2.x, gem2.y];
-  let newGridPos = [gem2.posX, gem2.posY];
-  gem2.posX = gem1.posX;
-  gem2.posY = gem1.posY;
-  gem2.id = getGemId(gem2.posX, gem2.posY)
-  gem1.posX = newGridPos[0];
-  gem1.posY = newGridPos[1];
-  gem1.id = getGemId(gem1.posX, gem1.posY);
+function swapPosition(item1, item2) {
+  let newPos = [item2.x, item2.y];
+  let newGridPos = [item2.posX, item2.posY];
+  item2.posX = item1.posX;
+  item2.posY = item1.posY;
+  item2.id = getItemIdFromXY(item2.posX, item2.posY)
+  item1.posX = newGridPos[0];
+  item1.posY = newGridPos[1];
+  item1.id = getItemIdFromXY(item1.posX, item1.posY);
 
-  const matches1 = getMatchesAtPosition(gem1.posX, gem1.posY, getGemColor(gem1));
-  const matches2 = getMatchesAtPosition(gem2.posX, gem2.posY, getGemColor(gem2));
+  const matches1 = getMatchesAtPosition(item1.posX, item1.posY, getItemColor(item1));
+  const matches2 = getMatchesAtPosition(item2.posX, item2.posY, getItemColor(item2));
 
   const onComplete = () => {
     if (matches1.length < 3 && matches2.length < 3) {
-      let newPos = [gem2.x, gem2.y];
-      let newGridPos = [gem2.posX, gem2.posY];
-      gem2.posX = gem1.posX;
-      gem2.posY = gem1.posY;
-      gem2.id = getGemId(gem2.posX, gem2.posY)
-      gem1.posX = newGridPos[0];
-      gem1.posY = newGridPos[1];
-      gem1.id = getGemId(gem1.posX, gem1.posY);
-      tweenGemPos(gem1, newPos[0], newPos[1], () => {});
-      tweenGemPos(gem2, gem1.x, gem1.y, () => {});
+      let newPos = [item2.x, item2.y];
+      let newGridPos = [item2.posX, item2.posY];
+      item2.posX = item1.posX;
+      item2.posY = item1.posY;
+      item2.id = getItemIdFromXY(item2.posX, item2.posY)
+      item1.posX = newGridPos[0];
+      item1.posY = newGridPos[1];
+      item1.id = getItemIdFromXY(item1.posX, item1.posY);
+      tweenItemPos(item1, newPos[0], newPos[1], () => {});
+      tweenItemPos(item2, item1.x, item1.y, () => {});
     } else {
       handleMatches(matches1);
-      handleMatches(matches2);      
+      handleMatches(matches2);
     }
   };
 
-  tweenGemPos(gem1, newPos[0], newPos[1], () => {});
-  tweenGemPos(gem2, gem1.x, gem1.y, onComplete);
+  tweenItemPos(item1, newPos[0], newPos[1], () => {});
+  tweenItemPos(item2, item1.x, item1.y, onComplete);
 }
 
 function handleMatches(matches) {
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
-      let matchToDestroy = gems.getChildren().find((gem) => gem.id === matches[i]);
+      let matchToDestroy = items.getChildren().find((item) => item.id === matches[i]);
       if (matchToDestroy) {
         matchToDestroy.destroy();
       }
@@ -188,33 +171,37 @@ function handleMatches(matches) {
   } 
 }
 
-function getGemColor(gem) {
-  if (!gem) return null;
-  return gem.category;
+function getItemColor(item) {
+  if (!item) return null;
+  return item.category;
 }
 
-function isAdjacent(gem1, gem2) {
-  // console.log(Math.abs(gem1.posX - gem2.posX), Math.abs(gem1.posY - gem2.posY));
-  return ((Math.abs(gem1.posX - gem2.posX) === 1 && Math.abs(gem1.posY - gem2.posY) === 0) || 
-          (Math.abs(gem1.posX - gem2.posX) === 0 && Math.abs(gem1.posY - gem2.posY) === 1));     
+function isAdjacent(item1, item2) {
+  // console.log(Math.abs(item1.posX - item2.posX), Math.abs(item1.posY - item2.posY));
+  return ((Math.abs(item1.posX - item2.posX) === 1 && Math.abs(item1.posY - item2.posY) === 0) || 
+          (Math.abs(item1.posX - item2.posX) === 0 && Math.abs(item1.posY - item2.posY) === 1));     
 }
 
-function getGemId(x, y) {
+function getItemIdFromXY(x, y) {
   return x + y * COLS;
 }
 
-function getGemByCoord(x, y) {
-  return gems.getChildren().find((gem) => gem.id === getGemId(x, y)); //.iterate('id', getGemId(x, y), Phaser.Group.RETURN_CHILD);
+function getItemXYFromId(i) {
+  return [Math.floor(i % COLS), Math.floor(i / COLS)];
+}
+
+function getItemByCoord(x, y) {
+  return items.getChildren().find((item) => item.id === getItemIdFromXY(x, y)); //.iterate('id', getItemIdFromXY(x, y), Phaser.Group.RETURN_CHILD);
 }
 
 function getMatchesAtPosition(x, y, color, opt_results) {
   results = opt_results || [];
   for (let i = Math.max(x - 1, 0); i <= Math.min(x + 1, COLS - 1); i++) {
     if (i !== x) {
-      let gem = getGemByCoord(i, y);
-      if (color === getGemColor(gem)) {
-        if (!results.includes(gem.id)) {
-          results.push(gem.id);
+      let item = getItemByCoord(i, y);
+      if (color === getItemColor(item)) {
+        if (!results.includes(item.id)) {
+          results.push(item.id);
           results.concat(getMatchesAtPosition(i, y, color, results));
         } 
       }
@@ -222,10 +209,10 @@ function getMatchesAtPosition(x, y, color, opt_results) {
   }
   for (let j = Math.max(y - 1, 0); j <= Math.min(y + 1, COLS - 1); j++) {
     if (j !== y) {
-      let gem = getGemByCoord(x, j);
-      if (color === getGemColor(gem)) { 
-        if (!results.includes(gem.id)) {
-          results.push(gem.id);
+      let item = getItemByCoord(x, j);
+      if (color === getItemColor(item)) { 
+        if (!results.includes(item.id)) {
+          results.push(item.id);
           results.concat(getMatchesAtPosition(x, j, color, results));
         }
       }
@@ -234,25 +221,14 @@ function getMatchesAtPosition(x, y, color, opt_results) {
   return results;
 }
 
-function tweenGemPos(gem, newPosX, newPosY, callback) {
-  // console.log('tween', gem.name, 'from', gem.x, gem.y, 'to', newPosX, newPosY);
+function tweenItemPos(item, newPosX, newPosY, callback) {
+  // console.log('tween', item.name, 'from', item.x, item.y, 'to', newPosX, newPosY);
   return game.scene.scenes[0].tweens.add({
-    targets: gem,
+    targets: item,
     x: newPosX,
     y: newPosY,
     duration: 500,
     ease: 'Power2',
     onComplete: callback,
   });
-
-  // var marker = game.add.image(100, 300, 'block').setAlpha(0.3);
-  // var image = game.add.image(100, 300, 'block');
-
-  // game.tweens.add({
-  //     targets: image,
-  //     x: 700,
-  //     duration: 3000,
-  //     ease: 'Power2',
-  //     completeDelay: 3000
-  // });
 }
