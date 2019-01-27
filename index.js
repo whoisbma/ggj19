@@ -22,7 +22,7 @@ const startY = (SPRITE_H * ITEM_SCALE_H) / 2;
 
 const game = new Phaser.Game({
   width: 800, 
-  height: 800, 
+  height: 950, 
   type: Phaser.AUTO, 
   parent: 'game_canvas',
   title: 'ggj19',
@@ -38,6 +38,10 @@ let cursor;
 let occupiedGrid = [];
 let occupiedGridGraphic = [];
 let selectedItem = null;
+let trashText;
+let trash = 0;
+let boxesText;
+let boxes = 0;
 
 function preload() {
   this.load.image('background', './assets/background.jpg');
@@ -98,6 +102,9 @@ function spawnCellAtXY(posX, posY) {
 }
 
 function create() {
+
+  trashText = this.add.text(100, 800, 'trash: 0', { fontSize: '32px', fill: '#fff' });
+  boxesText = this.add.text(100, 850, 'packed boxes: 0', { fontSize: '32px', fill: '#fff' });
   // bg = this.add.image(400, 400, 'background');
   // bg.setDepth(-10);
   // bg.setDisplaySize(800, 800);
@@ -340,6 +347,8 @@ function handleMatches(matches) {
     for (let i = 0; i < matchesToDestroy.length; i++) {
       numDeleted++;
       matchesToDestroy[i].destroy();
+      trash++;
+      trashText.setText('trash: ' + trash);
     }
     if (numDeleted > 0) {
       shiftDisplacedItems();      
