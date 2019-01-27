@@ -30,6 +30,7 @@ const game = new Phaser.Game({
 });
 
 let items;
+let itemsOnBoard = [];
 let cursor;
 let selectedItem = null;
 
@@ -42,13 +43,15 @@ function preload() {
 }
 
 function create() {
-  bg = this.add.image(400, 400, 'background');
-  bg.setDepth(-10);
-  bg.setDisplaySize(800, 800);
+  // bg = this.add.image(400, 400, 'background');
+  // bg.setDepth(-10);
+  // bg.setDisplaySize(800, 800);
   items = this.add.group();
 
   for (let i = 0; i < COLS; i++) {
+    itemsOnBoard[i] = [];
     for (let j = 0; j < ROWS; j++) {
+      itemsOnBoard[i][j] = true;
       let r = Phaser.Math.Between(0, 3);
       let item;
       const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
@@ -153,6 +156,7 @@ function swapPosition(item1, item2) {
     } else {
       handleMatches(matches1);
       handleMatches(matches2);
+      spawnMissingItems();
     }
   };
 
@@ -160,11 +164,84 @@ function swapPosition(item1, item2) {
   tweenItemPos(item2, item1.x, item1.y, onComplete);
 }
 
+function shiftAtPosByAmount(x, y, amt, dir) {
+  if (dir === 0) {
+    for (let yy = y; yy >= 0; yy--) {
+      // console.log('move at', x, yy, 'by', amt);
+      let itemToMove = getItemByCoord(x, yy);
+      if (!itemToMove) return;
+      let targetY = yy + amt;
+      itemToMove.posY = targetY;
+
+      let targetPos = getPositionFromXY(x, targetY);
+      itemToMove.y = targetPos.y;
+
+      itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
+      itemsOnBoard[x][targetY] = true;      
+    }
+
+  }
+}
+
+function killItemAtXY(x, y) {
+  let item = getItemByCoord(x, y);
+  if (!item) return;
+  item.destroy();
+  itemsOnBoard[x][y] = false;
+  spawnMissingItems();
+}
+
+function getPositionFromXY(x, y) {
+  const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
+  const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
+  const newX = startX + MARGIN + x * ITEM_SCALE_W * SPRITE_W + PADDING * x;
+  const newY = startY + MARGIN + y * ITEM_SCALE_H * SPRITE_H + PADDING * y;
+  return {
+    x: newX,
+    y: newY,
+  }
+}
+
+function spawnMissingItems() {
+  let dir = 0; // 0 top, 1 right, 2 down, 3 left ( FROM DIRECTION ) 
+
+  let PERP_DIR, LANE_DIR, INCR;
+  if (dir === 0) {
+    DIR = itemsOnBoard.length;
+    LANE_START = 0;
+    LANE_END = itemsOnBoard[0].length;
+    INCR = 1;
+  }
+
+
+  for (let i = 0; i < itemsOnBoard.length; i++) {
+
+    // from the bottom, count up.
+    // when you find an empty spot, start keeping track.
+    // the next time you find a full spot, move it down.
+    let emptyStart = -1;
+    for (let j = itemsOnBoard[0].length - 1; j >= 0; j--) {
+      if (!itemsOnBoard[i][j]) {
+        if (emptyStart === -1) {
+          emptyStart = j;
+        } 
+      } else {
+        if (emptyStart !== -1) {
+          shiftAtPosByAmount(i, j, emptyStart - j, dir);
+          emptyStart = -1;
+        }
+      }
+    }
+  }
+}
+
 function handleMatches(matches) {
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
       let matchToDestroy = items.getChildren().find((item) => item.id === matches[i]);
       if (matchToDestroy) {
+        let pos = getItemXYFromId(matchToDestroy.id);
+        itemsOnBoard[pos.x][pos.y] = false;
         matchToDestroy.destroy();
       }
     }
@@ -187,7 +264,10 @@ function getItemIdFromXY(x, y) {
 }
 
 function getItemXYFromId(i) {
-  return [Math.floor(i % COLS), Math.floor(i / COLS)];
+  return {
+    x: Math.floor(i % COLS),
+    y: Math.floor(i / COLS),
+  };
 }
 
 function getItemByCoord(x, y) {
