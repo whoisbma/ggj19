@@ -58,7 +58,7 @@ function create() {
     occupiedGridGraphic[i] = [];
     for (let j = 0; j < ROWS; j++) {
       itemsOnBoard[i][j] = true;
-      let r = Phaser.Math.Between(0, 5);
+
       let item;
       const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
       const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
@@ -81,6 +81,13 @@ function create() {
       occupiedGridGraphic[i][j].setDepth(-10);
       occupiedGridGraphic[i][j].setTint(0xffff00);
       occupiedGridGraphic[i][j].visible = false;
+
+      let r = Phaser.Math.Between(0, 5);
+
+      while (getMatchesAtPosition(i, j, r).length >= 2) {
+        r = Phaser.Math.Between(0, 5);
+      }
+      // console.log(getMatchesAtPosition(i, j, r));
 
       switch (Math.floor(r)) {
         case 0:
