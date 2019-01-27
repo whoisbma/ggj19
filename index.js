@@ -153,32 +153,18 @@ function swapPosition(item1, item2) {
       item1.id = getItemIdFromXY(item1.posX, item1.posY);
       tweenItemPos(item1, newPos[0], newPos[1], () => {});
       tweenItemPos(item2, item1.x, item1.y, () => {});
-    } else {
-      handleMatches(matches1.concat(matches2)); 
     }
   };
 
   tweenItemPos(item1, newPos[0], newPos[1], () => {});
   tweenItemPos(item2, item1.x, item1.y, onComplete);
-}
 
-function shiftAtPosByAmount(x, y, amt, dir) {
-  if (dir === 0) {
-    for (let yy = y; yy >= 0; yy--) {
-      // console.log('move at', x, yy, 'by', amt);
-      let itemToMove = getItemByCoord(x, yy);
-      if (!itemToMove) return;
-      let targetY = yy + amt;
-      itemToMove.posY = targetY;
-
-      let targetPos = getPositionFromXY(x, targetY);
-      // itemToMove.y = targetPos.y;
-      tweenItemPos(itemToMove, itemToMove.x, targetPos.y, () => {});
-
-      itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
-      itemsOnBoard[x][targetY] = true;      
-    }
-
+  if (matches1.length > 2 && matches2.length > 2) {
+    handleMatches(matches1.concat(matches2)); 
+  } else if (matches1.length > 2) {
+    handleMatches(matches1);
+  } else if (matches2.length > 2) {
+    handleMatches(matches2);
   }
 }
 
@@ -215,9 +201,7 @@ function spawnMissingItems() {
     INCR = 1;
   }
 
-
   for (let i = 0; i < itemsOnBoard.length; i++) {
-
     // from the bottom, count up.
     // when you find an empty spot, start keeping track.
     // the next time you find a full spot, move it down.
@@ -233,6 +217,29 @@ function spawnMissingItems() {
           emptyStart = -1;
         }
       }
+    }
+  }
+
+  // TODO: check for new matches HERE
+}
+
+function shiftAtPosByAmount(x, y, amt, dir) {
+  let itemsToMove = [];
+  let newXPositions = [];
+  let newYPositions = [];
+  if (dir === 0) {
+    for (let yy = y; yy >= 0; yy--) {
+      // console.log('move at', x, yy, 'by', amt);
+      let itemToMove = getItemByCoord(x, yy);
+      if (!itemToMove) continue;
+      let targetY = yy + amt;
+      itemToMove.posY = targetY;
+
+      let targetPos = getPositionFromXY(x, targetY);
+      tweenItemPos(itemToMove, itemToMove.x, targetPos.y, () => {});
+
+      itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
+      itemsOnBoard[x][targetY] = true;      
     }
   }
 }
@@ -292,7 +299,8 @@ function getMatchesAtPosition(x, y, color, opt_results) {
       if (color === getItemColor(item)) {
         if (!results.includes(item.id)) {
           results.push(item.id);
-          results.concat(getMatchesAtPosition(i, y, color, results));
+          results.concat(getMatchesAtPosition(i, y, color, results));   
+          // TODO: figure out why when i assigned results.concat, it started not working. same below.
         } 
       }
     }
@@ -318,6 +326,7 @@ function tweenDelete(item, callback) {
     scaleY: 0,
     duration: 250,
     ease: 'Power2',
+    delay: 600,
     onComplete: callback,
   });
 }
