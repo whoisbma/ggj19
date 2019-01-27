@@ -2,13 +2,20 @@ const canvas = document.getElementById('game_canvas');
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 
-var GEM_W = 64;
-var GEM_H = 64;
-let OFFSET = 125;
-let GEM_S = 1.5; 
-let PADDING = 10;
-let COLS = 6;
-let ROWS = 6;
+const WIDTH = 800;
+const HEIGHT = 800;
+const SPRITE_W = 64;
+const SPRITE_H = 64;
+
+const args = window.location.search.split('?');
+const COLS = parseInt(args[1]) || 8;
+const ROWS = parseInt(args[2]) || 8;
+const MARGIN = parseInt(args[3]) || 80;
+const PADDING = parseInt(args[4]) || 10;
+
+const ITEM_SCALE_W = ((WIDTH - (MARGIN * 2) - (COLS * PADDING))/ COLS)/SPRITE_W;
+const ITEM_SCALE_H = ((HEIGHT - (MARGIN * 2) - (ROWS * PADDING)) / ROWS)/SPRITE_H;
+const ITEM_SCALE = Math.min(ITEM_SCALE_W, ITEM_SCALE_H);
 
 const game = new Phaser.Game({
   width: 800, 
@@ -39,10 +46,6 @@ function preload() {
   this.load.image('oilbottle', './assets/oilbottle.png');
   this.load.image('plant', './assets/plant.png');
   this.load.image('scissors', './assets/scissors.png');
-  this.load.spritesheet('gems', './assets/gems32x24x5.png', {
-    frameWidth: GEM_W,
-    frameHeight: GEM_H,
-  });
 }
 
 function create() {
@@ -55,28 +58,32 @@ function create() {
     for (let j = 0; j < ROWS; j++) {
       let r = Phaser.Math.Between(0, 3);
       let gem;
+      const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
+      const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
+      const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
+      const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
       switch (Math.floor(r)) {
         case 0:
-          gem = gems.create(OFFSET + i * GEM_W * GEM_S + PADDING * i, OFFSET + j * GEM_H * GEM_S + PADDING * j, 'oilbottle');
+          gem = gems.create(x, y, 'oilbottle');
           gem.category = 0;
           break;
         case 1:
-          gem = gems.create(OFFSET + i * GEM_W * GEM_S + PADDING * i, OFFSET + j * GEM_H * GEM_S + PADDING * j, 'book');
+          gem = gems.create(x, y, 'book');
           gem.category = 1;
           break;
         case 2:
-          gem = gems.create(OFFSET + i * GEM_W * GEM_S + PADDING * i, OFFSET + j * GEM_H * GEM_S + PADDING * j, 'plant');
+          gem = gems.create(x, y, 'plant');
           gem.category = 2;
           break;
         case 3:
-          gem = gems.create(OFFSET + i * GEM_W * GEM_S + PADDING * i, OFFSET + j * GEM_H * GEM_S + PADDING * j, 'scissors');
+          gem = gems.create(x, y, 'scissors');
           gem.category = 3;
           break;
         default:
           break;
       }
       
-      gem.setScale(GEM_S,GEM_S);
+      gem.setScale(ITEM_SCALE, ITEM_SCALE);
       gem.setInteractive();
       gem.posX = i;
       gem.posY = j;
