@@ -206,7 +206,8 @@ function spawnMissingItems() {
     // when you find an empty spot, start keeping track.
     // the next time you find a full spot, move it down.
     let emptyStart = -1;
-    for (let j = itemsOnBoard[0].length - 1; j >= 0; j--) {
+    // let accum = 0;
+    for (let j = itemsOnBoard[0].length - 1; j >= 0; --j) {
       if (!itemsOnBoard[i][j]) {
         if (emptyStart === -1) {
           emptyStart = j;
@@ -214,6 +215,7 @@ function spawnMissingItems() {
       } else {
         if (emptyStart !== -1) {
           shiftAtPosByAmount(i, j, emptyStart - j, dir);
+          j = emptyStart ;
           emptyStart = -1;
         }
       }
@@ -224,17 +226,16 @@ function spawnMissingItems() {
 }
 
 function shiftAtPosByAmount(x, y, amt, dir) {
-  let itemsToMove = [];
-  let newXPositions = [];
-  let newYPositions = [];
   if (dir === 0) {
     for (let yy = y; yy >= 0; yy--) {
       // console.log('move at', x, yy, 'by', amt);
-      let itemToMove = getItemByCoord(x, yy);
-      if (!itemToMove) continue;
       let targetY = yy + amt;
+      let itemToMove = getItemByCoord(x, yy);
+      if (!itemToMove) {
+        itemsOnBoard[x][targetY] = false;
+        continue;
+      }
       itemToMove.posY = targetY;
-
       let targetPos = getPositionFromXY(x, targetY);
       tweenItemPos(itemToMove, itemToMove.x, targetPos.y, () => {});
 
