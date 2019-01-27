@@ -172,7 +172,8 @@ function shiftAtPosByAmount(x, y, amt, dir) {
       itemToMove.posY = targetY;
 
       let targetPos = getPositionFromXY(x, targetY);
-      itemToMove.y = targetPos.y;
+      // itemToMove.y = targetPos.y;
+      tweenItemPos(itemToMove, itemToMove.x, targetPos.y, () => {});
 
       itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
       itemsOnBoard[x][targetY] = true;      
