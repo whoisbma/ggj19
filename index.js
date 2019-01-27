@@ -17,6 +17,9 @@ const ITEM_SCALE_W = ((WIDTH - (MARGIN * 2) - (COLS * PADDING))/ COLS)/SPRITE_W;
 const ITEM_SCALE_H = ((HEIGHT - (MARGIN * 2) - (ROWS * PADDING)) / ROWS)/SPRITE_H;
 const ITEM_SCALE = Math.min(ITEM_SCALE_W, ITEM_SCALE_H);
 
+const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
+const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
+
 const game = new Phaser.Game({
   width: 800, 
   height: 800, 
@@ -46,6 +49,54 @@ function preload() {
   this.load.image('calculator', './assets/calculator.png');
 }
 
+function spawnCellAtXY(posX, posY) {
+
+  const x = startX + MARGIN + posX * ITEM_SCALE_W * SPRITE_W + PADDING * posX;
+  const y = startY + MARGIN + posY * ITEM_SCALE_H * SPRITE_H + PADDING * posY;
+
+  let r = Phaser.Math.Between(0, 5);
+
+  while (getMatchesAtPosition(posX, posY, r).length >= 2) {
+    r = Phaser.Math.Between(0, 5);
+  }
+  // console.log(getMatchesAtPosition(i, j, r));
+
+  switch (Math.floor(r)) {
+    case 0:
+      item = items.create(x, y, 'oilbottle');
+      item.category = 0;
+      break;
+    case 1:
+      item = items.create(x, y, 'book');
+      item.category = 1;
+      break;
+    case 2:
+      item = items.create(x, y, 'plant');
+      item.category = 2;
+      break;
+    case 3:
+      item = items.create(x, y, 'scissors');
+      item.category = 3;
+      break;
+    case 4:
+      item = items.create(x, y, 'bodegacup');
+      item.category = 4;
+      break;
+    case 5:
+      item = items.create(x, y, 'calculator');
+      item.category = 5;
+    default:
+      break;
+  }
+  
+  item.setScale(ITEM_SCALE, ITEM_SCALE);
+  item.setInteractive();
+  item.posX = posX;
+  item.posY = posY;
+  item.id = getItemIdFromXY(posX, posY);
+  item.name = 'item' + posX.toString() + 'x' + posY.toString();
+}
+
 function create() {
   // bg = this.add.image(400, 400, 'background');
   // bg.setDepth(-10);
@@ -60,8 +111,7 @@ function create() {
       itemsOnBoard[i][j] = true;
 
       let item;
-      const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
-      const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
+
       const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
       const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
 
@@ -82,47 +132,7 @@ function create() {
       occupiedGridGraphic[i][j].setTint(0xffff00);
       occupiedGridGraphic[i][j].visible = false;
 
-      let r = Phaser.Math.Between(0, 5);
-
-      while (getMatchesAtPosition(i, j, r).length >= 2) {
-        r = Phaser.Math.Between(0, 5);
-      }
-      // console.log(getMatchesAtPosition(i, j, r));
-
-      switch (Math.floor(r)) {
-        case 0:
-          item = items.create(x, y, 'oilbottle');
-          item.category = 0;
-          break;
-        case 1:
-          item = items.create(x, y, 'book');
-          item.category = 1;
-          break;
-        case 2:
-          item = items.create(x, y, 'plant');
-          item.category = 2;
-          break;
-        case 3:
-          item = items.create(x, y, 'scissors');
-          item.category = 3;
-          break;
-        case 4:
-          item = items.create(x, y, 'bodegacup');
-          item.category = 4;
-          break;
-        case 5:
-          item = items.create(x, y, 'calculator');
-          item.category = 5;
-        default:
-          break;
-      }
-      
-      item.setScale(ITEM_SCALE, ITEM_SCALE);
-      item.setInteractive();
-      item.posX = i;
-      item.posY = j;
-      item.id = getItemIdFromXY(i, j);
-      item.name = 'item' + i.toString() + 'x' + j.toString();
+      spawnCellAtXY(i, j);
     }
   }
 
@@ -276,9 +286,7 @@ function shiftDisplacedItems() {
       filteredMatches.push(item);
     }
   });
-  // if (filteredMatches.length > 2) {
   handleMatches(filteredMatches);    
-  // }
 }
 
 function shiftAtPosByAmount(x, y, amt, dir) {
@@ -335,8 +343,22 @@ function handleMatches(matches) {
     }
     if (numDeleted > 0) {
       shiftDisplacedItems();      
+    } else {
+      fillEmptyCells();
     }
   });
+}
+
+function fillEmptyCells() {
+  for (let i = 0; i < itemsOnBoard.length; i++) {
+    for (let j = 0; j < itemsOnBoard[0].length; j++) {
+      if (!itemsOnBoard[i][j]) {
+        spawnCellAtXY(i, j);
+        itemsOnBoard[i][j] = true;
+        occupiedGridGraphic[i][j].setTint(0xffff00);
+      }
+    }
+  }
 }
 
 function getItemColor(item) {
