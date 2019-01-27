@@ -42,6 +42,13 @@ let trashText;
 let trash = 0;
 let boxesText;
 let boxes = 0;
+let boxIdPositions = [];
+let boxGrid = [];
+let boxGridGraphic = [];
+let itemRequirements = [];
+let itemRequirementImages;
+
+
 
 function preload() {
   this.load.image('background', './assets/background.jpg');
@@ -51,10 +58,186 @@ function preload() {
   this.load.image('scissors', './assets/scissors.png');
   this.load.image('bodegacup', './assets/bodegacup.png');
   this.load.image('calculator', './assets/calculator.png');
+  this.load.image('rug', './assets/rug.png');
+}
+
+function setItemRequirements() {
+
+  for (let i = 0; i < 4; i++) {
+    // let redo = false;
+    // while (!redo) {
+      let r = Phaser.Math.Between(0, 5);
+      // 
+      // for (let n = 0; n < boxIdPositions.length; n++) {
+        // let itemToCheck = ;
+        // if (itemToCheck.category === r) {
+          // redo = true;
+        // }
+      // }
+    // }
+
+    itemRequirements.push(r);
+    let item;
+    let x = 450 + 90 * i;
+    let y = 850;
+
+    switch (Math.floor(r)) {
+      case 0:
+        item = itemRequirementImages.create(x, y, 'oilbottle');
+        break;
+      case 1:
+        item = itemRequirementImages.create(x, y, 'book');
+        break;
+      case 2:
+        item = itemRequirementImages.create(x, y, 'plant');
+        item.category = 2;
+        break;
+      case 3:
+        item = itemRequirementImages.create(x, y, 'scissors');
+        item.category = 3;
+        break;
+      case 4:
+        item = itemRequirementImages.create(x, y, 'bodegacup');
+        item.category = 4;
+        break;
+      case 5:
+        item = itemRequirementImages.create(x, y, 'calculator');
+        item.category = 5;
+      default:
+        break;
+    }
+    
+    item.setScale(ITEM_SCALE, ITEM_SCALE);
+
+  }
+}
+
+function containsRequiredItem(x, y) {
+  if (itemRequirements.contains(getItemColor(getItemByCoord(x, y)))) {
+    return true;
+  }
+  return false;
+}
+
+function setBoxArea() {
+  boxIdPositions = [];
+
+  let startX = 1 + Math.floor(Math.random(1) * (COLS - 2));
+  let startY = 1 + Math.floor(Math.random(1) * (ROWS - 2));
+  for (let i = startX - 1; i < startX + 2; i++) {
+    for (let j = startY - 1; j < startY + 2; j++) {
+      boxIdPositions.push(getItemIdFromXY(i, j));
+    }
+  }
+}
+
+function create() {
+  itemRequirementImages = this.add.group();
+  setBoxArea();
+  setItemRequirements();
+  trashText = this.add.text(50, 800, 'trash: 0', { fontSize: '32px', fill: '#fff' });
+  boxesText = this.add.text(50, 850, 'packed boxes: 0', { fontSize: '32px', fill: '#fff' });
+  bg = this.add.image(400, 400, 'rug');
+  bg.setDepth(-10);
+  bg.setDisplaySize(800, 800);
+  bg.setScale(1.5, 1.5);
+  items = this.add.group();
+
+  for (let i = 0; i < COLS; i++) {
+    itemsOnBoard[i] = [];
+    occupiedGrid[i] = [];
+    occupiedGridGraphic[i] = [];
+    boxGrid[i] = [];
+    boxGridGraphic[i] = [];
+    for (let j = 0; j < ROWS; j++) {
+      itemsOnBoard[i][j] = true;
+
+      const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
+      const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
+
+      occupiedGrid[i][j] = this.make.graphics({
+        x: x,
+        y: y, 
+        add: false,
+        fillStyle: {
+          color: 0xffffff,
+          alpha:1,
+        },
+      });
+      occupiedGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      occupiedGrid[i][j].generateTexture('debugblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      occupiedGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'debugblock');
+      occupiedGridGraphic[i][j].setPosition(x, y);
+      occupiedGridGraphic[i][j].setDepth(-10);
+      occupiedGridGraphic[i][j].setTint(0xffff00);
+      occupiedGridGraphic[i][j].visible = false;
+
+      boxGrid[i][j] = this.make.graphics({
+        x: x,
+        y: y, 
+        add: false,
+        fillStyle: {
+          color: 0xffffff,
+          alpha:1,
+        },
+      });
+      boxGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      boxGrid[i][j].generateTexture('boxblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+      boxGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'boxblock');
+      boxGridGraphic[i][j].setPosition(x, y);
+      boxGridGraphic[i][j].setDepth(-10);
+      boxGridGraphic[i][j].setTint(0xffff00);
+      if (boxIdPositions.includes(getItemIdFromXY(i, j))) {
+        boxGridGraphic[i][j].visible = true;
+      } else {
+        boxGridGraphic[i][j].visible = false;
+      }
+      spawnCellAtXY(i, j);
+    }
+  }
+
+  cursor = this.make.graphics({
+    x: 0,
+    y: 0,
+    add: false, 
+    fillStyle: {
+      color: 0xffffff,
+      alpha: 0.5
+    },
+  });
+  cursor.fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  cursor.generateTexture('block', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  let highlighted = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'block');
+  highlighted.setDepth(-1);
+
+  this.input.on('pointerover', (pointer, gameObjects) => {
+    highlighted.setPosition(gameObjects[0].x, gameObjects[0].y);
+  });
+
+  this.input.on('pointerdown', (pointer, gameObjects) => {
+    // if its part of items group,
+    if (items.children.entries.indexOf(gameObjects[0]) > -1) {
+      selectedItem = gameObjects[0];
+      selectedItem.setTint(0x333333);
+    }
+  });
+
+  this.input.on('pointerup', (pointer, gameObjects) => {
+    if (selectedItem !== null) {
+      if (gameObjects.length > 0) {
+        const swappedItem = gameObjects[0];
+        if (isAdjacent(swappedItem, selectedItem)) {
+          swapPosition(selectedItem, swappedItem);
+        }
+      }
+    selectedItem.clearTint();
+    selectedItem = null;
+    } 
+  });
 }
 
 function spawnCellAtXY(posX, posY) {
-
+  let item;
   const x = startX + MARGIN + posX * ITEM_SCALE_W * SPRITE_W + PADDING * posX;
   const y = startY + MARGIN + posY * ITEM_SCALE_H * SPRITE_H + PADDING * posY;
 
@@ -99,88 +282,6 @@ function spawnCellAtXY(posX, posY) {
   item.posY = posY;
   item.id = getItemIdFromXY(posX, posY);
   item.name = 'item' + posX.toString() + 'x' + posY.toString();
-}
-
-function create() {
-
-  trashText = this.add.text(100, 800, 'trash: 0', { fontSize: '32px', fill: '#fff' });
-  boxesText = this.add.text(100, 850, 'packed boxes: 0', { fontSize: '32px', fill: '#fff' });
-  // bg = this.add.image(400, 400, 'background');
-  // bg.setDepth(-10);
-  // bg.setDisplaySize(800, 800);
-  items = this.add.group();
-
-  for (let i = 0; i < COLS; i++) {
-    itemsOnBoard[i] = [];
-    occupiedGrid[i] = [];
-    occupiedGridGraphic[i] = [];
-    for (let j = 0; j < ROWS; j++) {
-      itemsOnBoard[i][j] = true;
-
-      let item;
-
-      const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
-      const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
-
-      occupiedGrid[i][j] = this.make.graphics({
-        x: x,
-        y: y, 
-        add: false,
-        fillStyle: {
-          color: 0xffffff,
-          alpha:1,
-        },
-      });
-      occupiedGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      occupiedGrid[i][j].generateTexture('debugblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      occupiedGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'debugblock');
-      occupiedGridGraphic[i][j].setPosition(x, y);
-      occupiedGridGraphic[i][j].setDepth(-10);
-      occupiedGridGraphic[i][j].setTint(0xffff00);
-      occupiedGridGraphic[i][j].visible = false;
-
-      spawnCellAtXY(i, j);
-    }
-  }
-
-  cursor = this.make.graphics({
-    x: 0,
-    y: 0,
-    add: false, 
-    fillStyle: {
-      color: 0xffffff,
-      alpha: 0.5
-    },
-  });
-  cursor.fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-  cursor.generateTexture('block', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-  let highlighted = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'block');
-  highlighted.setDepth(-1);
-
-  this.input.on('pointerover', (pointer, gameObjects) => {
-    highlighted.setPosition(gameObjects[0].x, gameObjects[0].y);
-  });
-
-  this.input.on('pointerdown', (pointer, gameObjects) => {
-    // if its part of items group,
-    if (items.children.entries.indexOf(gameObjects[0]) > -1) {
-      selectedItem = gameObjects[0];
-      selectedItem.setTint(0x333333);
-    }
-  });
-
-  this.input.on('pointerup', (pointer, gameObjects) => {
-    if (selectedItem !== null) {
-      if (gameObjects.length > 0) {
-        const swappedItem = gameObjects[0];
-        if (isAdjacent(swappedItem, selectedItem)) {
-          swapPosition(selectedItem, swappedItem);
-        }
-      }
-    selectedItem.clearTint();
-    selectedItem = null;
-    } 
-  });
 }
 
 function swapPosition(item1, item2) {
