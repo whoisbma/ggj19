@@ -2,23 +2,37 @@ const canvas = document.getElementById('game_canvas');
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;
 
-const WIDTH = 800;
-const HEIGHT = 800;
+const WIDTH = 900;
+const HEIGHT = 900;
 const SPRITE_W = 64;
 const SPRITE_H = 64;
 
 const args = window.location.search.split('?');
-const COLS = parseInt(args[1]) || 8;
-const ROWS = parseInt(args[2]) || 8;
-const MARGIN = parseInt(args[3]) || 80;
-const PADDING = parseInt(args[4]) || 10;
+const COLS = parseInt(args[1]) || 7;
+const ROWS = parseInt(args[2]) || 7;
+const MARGIN = parseInt(args[3]) || 130;
+const PADDING = parseInt(args[4]) || 4;
 
 const ITEM_SCALE_W = ((WIDTH - (MARGIN * 2) - (COLS * PADDING))/ COLS)/SPRITE_W;
 const ITEM_SCALE_H = ((HEIGHT - (MARGIN * 2) - (ROWS * PADDING)) / ROWS)/SPRITE_H;
 const ITEM_SCALE = Math.min(ITEM_SCALE_W, ITEM_SCALE_H);
 
+const ITEMS = [
+  'book',
+  'oilbottle',
+  'plant',
+  'scissors',
+  'bodegacup',
+  'calculator'
+];
+
+const NUM_ITEMS = ITEMS.length - 0;
+
 const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
 const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
+
+let trash = 0;
+let boxes = 0;
 
 const game = new Phaser.Game({
   width: 800, 
@@ -32,191 +46,127 @@ const game = new Phaser.Game({
   },
 });
 
-let items;
-let itemsOnBoard = [];
-let cursor;
-let occupiedGrid = [];
-let occupiedGridGraphic = [];
+// phaser groups
+let itemsGroup; // the current sprites in the scene
+let itemReqsGroup; // the current sprites listed as requirements for the box
+
+let boardState = [];  // state of the board itself, are cells occupied?
 let selectedItem = null;
 let trashText;
-let trash = 0;
 let boxesText;
-let boxes = 0;
 let boxIdPositions = [];
-let boxGrid = [];
 let boxGridGraphic = [];
-let itemRequirements = [];
-let itemRequirementImages;
 
-
+// debug stuff
+let debug_gridRects = []; // rects for visualizing board state
 
 function preload() {
   this.load.image('background', './assets/background.jpg');
-  this.load.image('book', './assets/book.png');
-  this.load.image('oilbottle', './assets/oilbottle.png');
-  this.load.image('plant', './assets/plant.png');
-  this.load.image('scissors', './assets/scissors.png');
-  this.load.image('bodegacup', './assets/bodegacup.png');
-  this.load.image('calculator', './assets/calculator.png');
   this.load.image('rug', './assets/rug.png');
+  for (let i = 0; i < NUM_ITEMS; i++) {
+    this.load.image(ITEMS[i], './assets/' + ITEMS[i] + '.png');
+  }
 }
 
 function setItemRequirements() {
-
   for (let i = 0; i < 4; i++) {
-    // let redo = false;
-    // while (!redo) {
-      let r = Phaser.Math.Between(0, 5);
-      // 
-      // for (let n = 0; n < boxIdPositions.length; n++) {
-        // let itemToCheck = ;
-        // if (itemToCheck.category === r) {
-          // redo = true;
-        // }
-      // }
-    // }
-
-    itemRequirements.push(r);
-    let item;
-    let x = 450 + 90 * i;
-    let y = 850;
-
-    switch (Math.floor(r)) {
-      case 0:
-        item = itemRequirementImages.create(x, y, 'oilbottle');
-        break;
-      case 1:
-        item = itemRequirementImages.create(x, y, 'book');
-        break;
-      case 2:
-        item = itemRequirementImages.create(x, y, 'plant');
-        item.category = 2;
-        break;
-      case 3:
-        item = itemRequirementImages.create(x, y, 'scissors');
-        item.category = 3;
-        break;
-      case 4:
-        item = itemRequirementImages.create(x, y, 'bodegacup');
-        item.category = 4;
-        break;
-      case 5:
-        item = itemRequirementImages.create(x, y, 'calculator');
-        item.category = 5;
-      default:
-        break;
-    }
-    
-    item.setScale(ITEM_SCALE, ITEM_SCALE);
-
+    let r = Phaser.Math.Between(0, NUM_ITEMS - 1);
+    let x = 500 + 90 * i;
+    let y = 920;
+    let item = itemReqsGroup.create(x, y, ITEMS[r]);
+    item.itemType = r;
+    item.setScale(ITEM_SCALE/1.5, ITEM_SCALE/1.5);
   }
 }
 
 function containsRequiredItem(x, y) {
-  if (itemRequirements.contains(getItemColor(getItemByCoord(x, y)))) {
-    return true;
-  }
-  return false;
+  // if (itemRequirements.contains(getItemType(getItemByXY(x, y)))) {
+  //   return true;
+  // }
+  // return false;
 }
 
-function setBoxArea() {
+function setBoxArea(instance) {
   boxIdPositions = [];
 
-  let startX = 1 + Math.floor(Math.random(1) * (COLS - 2));
-  let startY = 1 + Math.floor(Math.random(1) * (ROWS - 2));
+  let startX = Math.floor((COLS) / 2);
+  let startY = Math.floor((ROWS) / 2);
+
+  let graphics = instance.make.graphics().lineStyle(5, 0x000000, 1).strokeRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+
+  graphics.generateTexture('boxRect', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+
   for (let i = startX - 1; i < startX + 2; i++) {
+    boxGridGraphic[i] = [];
     for (let j = startY - 1; j < startY + 2; j++) {
-      boxIdPositions.push(getItemIdFromXY(i, j));
+      boxIdPositions.push(getIdxFromXY(i, j));
+
+      let pos = getPixelPosFromXY(i,j);
+      boxGridGraphic[i][j] = instance.add.image(pos.x, pos.y, 'boxRect');
+      boxGridGraphic[i][j].setDepth(-1);
     }
   }
+
+  graphics.destroy();
+}
+
+function createDebugGridGraphics(instance) {
+  let graphics = instance.make.graphics().fillStyle(0xffffff).fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  graphics.generateTexture('debugRect', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+
+  for (let i = 0; i < COLS; i++) {
+    debug_gridRects[i] = [];
+    for (let j = 0; j < ROWS; j++) {
+      let pos = getPixelPosFromXY(i,j);
+      debug_gridRects[i][j] = instance.add.image(pos.x, pos.y, 'debugRect');
+      debug_gridRects[i][j].setDepth(-2);
+      debug_gridRects[i][j].setTint(0xaaaaff);
+      debug_gridRects[i][j].visible = true;
+      debug_gridRects[i][j].setAlpha(0.5);
+    }
+  }
+}
+
+function createCursorGraphic(instance) {
+  let graphics = instance.make.graphics().fillStyle(0xffffff, 0.5).fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+  graphics.generateTexture('cursorRect', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
+
+  let cursor = instance.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'cursorRect');
+  cursor.setDepth(-1);
+
+  instance.input.on('pointerover', (pointer, gameObjects) => {
+    cursor.setPosition(gameObjects[0].x, gameObjects[0].y);
+  });
 }
 
 function create() {
-  itemRequirementImages = this.add.group();
-  setBoxArea();
+  itemsGroup = this.add.group();
+  itemReqsGroup = this.add.group();
+
+  setBoxArea(this);
+  createDebugGridGraphics(this);
+  createCursorGraphic(this);
+
   setItemRequirements();
-  trashText = this.add.text(50, 800, 'trash: 0', { fontSize: '32px', fill: '#fff' });
-  boxesText = this.add.text(50, 850, 'packed boxes: 0', { fontSize: '32px', fill: '#fff' });
-  bg = this.add.image(400, 400, 'rug');
+
+  trashText = this.add.text(50, 895, 'trash: 0', { fontSize: '24px', fill: '#fff' });
+  boxesText = this.add.text(50, 925, 'packed boxes: 0', { fontSize: '24px', fill: '#fff' });
+  bg = this.add.image(450, 450, 'rug');
   bg.setDepth(-10);
   bg.setDisplaySize(800, 800);
   bg.setScale(1.5, 1.5);
-  items = this.add.group();
 
   for (let i = 0; i < COLS; i++) {
-    itemsOnBoard[i] = [];
-    occupiedGrid[i] = [];
-    occupiedGridGraphic[i] = [];
-    boxGrid[i] = [];
-    boxGridGraphic[i] = [];
+    boardState[i] = [];
     for (let j = 0; j < ROWS; j++) {
-      itemsOnBoard[i][j] = true;
-
-      const x = startX + MARGIN + i * ITEM_SCALE_W * SPRITE_W + PADDING * i;
-      const y = startY + MARGIN + j * ITEM_SCALE_H * SPRITE_H + PADDING * j;
-
-      occupiedGrid[i][j] = this.make.graphics({
-        x: x,
-        y: y, 
-        add: false,
-        fillStyle: {
-          color: 0xffffff,
-          alpha:1,
-        },
-      });
-      occupiedGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      occupiedGrid[i][j].generateTexture('debugblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      occupiedGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'debugblock');
-      occupiedGridGraphic[i][j].setPosition(x, y);
-      occupiedGridGraphic[i][j].setDepth(-10);
-      occupiedGridGraphic[i][j].setTint(0xffff00);
-      occupiedGridGraphic[i][j].visible = false;
-
-      boxGrid[i][j] = this.make.graphics({
-        x: x,
-        y: y, 
-        add: false,
-        fillStyle: {
-          color: 0xffffff,
-          alpha:1,
-        },
-      });
-      boxGrid[i][j].fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      boxGrid[i][j].generateTexture('boxblock', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-      boxGridGraphic[i][j] = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'boxblock');
-      boxGridGraphic[i][j].setPosition(x, y);
-      boxGridGraphic[i][j].setDepth(-10);
-      boxGridGraphic[i][j].setTint(0xffff00);
-      if (boxIdPositions.includes(getItemIdFromXY(i, j))) {
-        boxGridGraphic[i][j].visible = true;
-      } else {
-        boxGridGraphic[i][j].visible = false;
-      }
-      spawnCellAtXY(i, j);
+      boardState[i][j] = true;
+      createItemAtXY(i, j);
     }
   }
 
-  cursor = this.make.graphics({
-    x: 0,
-    y: 0,
-    add: false, 
-    fillStyle: {
-      color: 0xffffff,
-      alpha: 0.5
-    },
-  });
-  cursor.fillRect(0, 0, ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-  cursor.generateTexture('block', ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H);
-  let highlighted = this.add.image(ITEM_SCALE * SPRITE_W, ITEM_SCALE * SPRITE_H, 'block');
-  highlighted.setDepth(-1);
-
-  this.input.on('pointerover', (pointer, gameObjects) => {
-    highlighted.setPosition(gameObjects[0].x, gameObjects[0].y);
-  });
-
   this.input.on('pointerdown', (pointer, gameObjects) => {
     // if its part of items group,
-    if (items.children.entries.indexOf(gameObjects[0]) > -1) {
+    if (itemsGroup.children.entries.indexOf(gameObjects[0]) > -1) {
       selectedItem = gameObjects[0];
       selectedItem.setTint(0x333333);
     }
@@ -236,51 +186,24 @@ function create() {
   });
 }
 
-function spawnCellAtXY(posX, posY) {
+function createItemAtXY(posX, posY) {
   let item;
   const x = startX + MARGIN + posX * ITEM_SCALE_W * SPRITE_W + PADDING * posX;
   const y = startY + MARGIN + posY * ITEM_SCALE_H * SPRITE_H + PADDING * posY;
 
-  let r = Phaser.Math.Between(0, 5);
+  let r = Phaser.Math.Between(0, NUM_ITEMS - 1);
 
   while (getMatchesAtPosition(posX, posY, r).length >= 2) {
-    r = Phaser.Math.Between(0, 5);
+    r = Phaser.Math.Between(0, NUM_ITEMS - 1);
   }
   // console.log(getMatchesAtPosition(i, j, r));
-
-  switch (Math.floor(r)) {
-    case 0:
-      item = items.create(x, y, 'oilbottle');
-      item.category = 0;
-      break;
-    case 1:
-      item = items.create(x, y, 'book');
-      item.category = 1;
-      break;
-    case 2:
-      item = items.create(x, y, 'plant');
-      item.category = 2;
-      break;
-    case 3:
-      item = items.create(x, y, 'scissors');
-      item.category = 3;
-      break;
-    case 4:
-      item = items.create(x, y, 'bodegacup');
-      item.category = 4;
-      break;
-    case 5:
-      item = items.create(x, y, 'calculator');
-      item.category = 5;
-    default:
-      break;
-  }
-  
+  item = itemsGroup.create(x, y, ITEMS[r]);
+  item.itemType = r;  
   item.setScale(ITEM_SCALE, ITEM_SCALE);
   item.setInteractive();
   item.posX = posX;
   item.posY = posY;
-  item.id = getItemIdFromXY(posX, posY);
+  item.idx = getIdxFromXY(posX, posY);
   item.name = 'item' + posX.toString() + 'x' + posY.toString();
 }
 
@@ -289,13 +212,13 @@ function swapPosition(item1, item2) {
   let newGridPos = [item2.posX, item2.posY];
   item2.posX = item1.posX;
   item2.posY = item1.posY;
-  item2.id = getItemIdFromXY(item2.posX, item2.posY)
+  item2.idx = getIdxFromXY(item2.posX, item2.posY)
   item1.posX = newGridPos[0];
   item1.posY = newGridPos[1];
-  item1.id = getItemIdFromXY(item1.posX, item1.posY);
+  item1.idx = getIdxFromXY(item1.posX, item1.posY);
 
-  const matches1 = getMatchesAtPosition(item1.posX, item1.posY, getItemColor(item1));
-  const matches2 = getMatchesAtPosition(item2.posX, item2.posY, getItemColor(item2));
+  const matches1 = getMatchesAtPosition(item1.posX, item1.posY, getItemType(item1));
+  const matches2 = getMatchesAtPosition(item2.posX, item2.posY, getItemType(item2));
 
   const onComplete = () => {
     if (matches1.length < 3 && matches2.length < 3) {
@@ -303,10 +226,10 @@ function swapPosition(item1, item2) {
       let newGridPos = [item2.posX, item2.posY];
       item2.posX = item1.posX;
       item2.posY = item1.posY;
-      item2.id = getItemIdFromXY(item2.posX, item2.posY)
+      item2.idx = getIdxFromXY(item2.posX, item2.posY)
       item1.posX = newGridPos[0];
       item1.posY = newGridPos[1];
-      item1.id = getItemIdFromXY(item1.posX, item1.posY);
+      item1.idx = getIdxFromXY(item1.posX, item1.posY);
       tweenItemPos(item1, newPos[0], newPos[1], () => {});
       tweenItemPos(item2, item1.x, item1.y, () => {});
     }
@@ -325,18 +248,18 @@ function swapPosition(item1, item2) {
 }
 
 function killItemAtXY(x, y) {
-  let item = getItemByCoord(x, y);
+  let item = getItemByXY(x, y);
   if (!item) return;
 
   tweenDelete(item, () => {
     item.destroy();
-    itemsOnBoard[x][y] = false;
-    occupiedGridGraphic[x][y].setTint(0xff00ff);
+    boardState[x][y] = false;
+    debug_gridRects[x][y].setTint(0xff00ff);
     shiftDisplacedItems();
   });
 }
 
-function getPositionFromXY(x, y) {
+function getPixelPosFromXY(x, y) {
   const startX = (SPRITE_W * ITEM_SCALE_W) / 2;
   const startY = (SPRITE_H * ITEM_SCALE_H) / 2; 
   const newX = startX + MARGIN + x * ITEM_SCALE_W * SPRITE_W + PADDING * x;
@@ -353,19 +276,19 @@ function shiftDisplacedItems() {
 
   let PERP_DIR, LANE_DIR, INCR;
   if (dir === 0) {
-    DIR = itemsOnBoard.length;
+    DIR = boardState.length;
     LANE_START = 0;
-    LANE_END = itemsOnBoard[0].length;
+    LANE_END = boardState[0].length;
     INCR = 1;
   }
 
-  for (let i = 0; i < itemsOnBoard.length; i++) {
+  for (let i = 0; i < COLS; i++) {
     // from the bottom, count up.
     // when you find an empty spot, start keeping track.
     // the next time you find a full spot, move it down.
     let emptyStart = -1;
-    for (let j = itemsOnBoard[0].length - 1; j >= 0; --j) {
-      if (!itemsOnBoard[i][j]) {
+    for (let j = ROWS - 1; j >= 0; --j) {
+      if (!boardState[i][j]) {
         if (emptyStart === -1) {
           emptyStart = j;
         } 
@@ -382,10 +305,10 @@ function shiftDisplacedItems() {
 
   let matches = [];
   totalDisplacedItems.forEach((item, i) => {
-    // item.setTint(0x00ff00);
-    let theseMatches = getMatchesAtPosition(item.posX, item.posY, getItemColor(item));
+    item.setTint(0x00ff00);
+    let theseMatches = getMatchesAtPosition(item.posX, item.posY, getItemType(item));
     if (theseMatches.length > 2) {
-      matches = matches.concat(getMatchesAtPosition(item.posX, item.posY, getItemColor(item)));
+      matches = matches.concat(getMatchesAtPosition(item.posX, item.posY, getItemType(item)));
     }
   });
   let filteredMatches = [];
@@ -403,16 +326,16 @@ function shiftAtPosByAmount(x, y, amt, dir) {
     for (let yy = y; yy >= 0; yy--) {
       // console.log('move at', x, yy, 'by', amt);
       let targetY = yy + amt;
-      let itemToMove = getItemByCoord(x, yy);
+      let itemToMove = getItemByXY(x, yy);
       if (!itemToMove) {
-        itemsOnBoard[x][targetY] = false;
-        occupiedGridGraphic[x][targetY].setTint(0xff00ff);
+        boardState[x][targetY] = false;
+        debug_gridRects[x][targetY].setTint(0xff00ff);
       } else {
         itemToMove.posY = targetY;
-        let targetPos = getPositionFromXY(x, targetY);
-        itemToMove.id = getItemIdFromXY(itemToMove.posX, itemToMove.posY);
-        itemsOnBoard[x][targetY] = true;
-        occupiedGridGraphic[x][targetY].setTint(0xffff00);
+        let targetPos = getPixelPosFromXY(x, targetY);
+        itemToMove.idx = getIdxFromXY(itemToMove.posX, itemToMove.posY);
+        boardState[x][targetY] = true;
+        debug_gridRects[x][targetY].setTint(0xaaaaff);
         displacedItems.push(itemToMove);
 
         tweenItemPos(itemToMove, targetPos.x, targetPos.y, () => {itemToMove.setTint(0xffffff);});        
@@ -420,8 +343,8 @@ function shiftAtPosByAmount(x, y, amt, dir) {
     }
 
     for (let y = 0; y < amt; y++) {
-      itemsOnBoard[x][y] = false;
-      occupiedGridGraphic[x][y].setTint(0xff00ff);
+      boardState[x][y] = false;
+      debug_gridRects[x][y].setTint(0xff00ff);
     }
   }
 
@@ -433,12 +356,12 @@ function handleMatches(matches) {
   let matchesToDestroy = [];
   if (matches.length > 2) {
     for (let i = 0 ; i < matches.length; i++) {
-      let matchToDestroy = items.getChildren().find((item) => item.id === matches[i]);
+      let matchToDestroy = itemsGroup.getChildren().find((item) => item.idx === matches[i]);
       if (matchToDestroy) {    
         matchesToDestroy.push(matchToDestroy);
-        let pos = getItemXYFromId(matchesToDestroy[i].id);
-        itemsOnBoard[pos.x][pos.y] = false;
-        occupiedGridGraphic[pos.x][pos.y].setTint(0xff00ff);
+        let pos = getXYFromIdx(matchesToDestroy[i].idx);
+        boardState[pos.x][pos.y] = false;
+        debug_gridRects[pos.x][pos.y].setTint(0xff00ff);
       }
     }
   }
@@ -460,20 +383,20 @@ function handleMatches(matches) {
 }
 
 function fillEmptyCells() {
-  for (let i = 0; i < itemsOnBoard.length; i++) {
-    for (let j = 0; j < itemsOnBoard[0].length; j++) {
-      if (!itemsOnBoard[i][j]) {
-        spawnCellAtXY(i, j);
-        itemsOnBoard[i][j] = true;
-        occupiedGridGraphic[i][j].setTint(0xffff00);
+  for (let i = 0; i < COLS; i++) {
+    for (let j = 0; j < ROWS; j++) {
+      if (!boardState[i][j]) {
+        createItemAtXY(i, j);
+        boardState[i][j] = true;
+        debug_gridRects[i][j].setTint(0xffffff);
       }
     }
   }
 }
 
-function getItemColor(item) {
+function getItemType(item) {
   if (!item) return null;
-  return item.category;
+  return item.itemType;
 }
 
 function isAdjacent(item1, item2) {
@@ -482,29 +405,29 @@ function isAdjacent(item1, item2) {
           (Math.abs(item1.posX - item2.posX) === 0 && Math.abs(item1.posY - item2.posY) === 1));     
 }
 
-function getItemIdFromXY(x, y) {
+function getIdxFromXY(x, y) {
   return x + y * COLS;
 }
 
-function getItemXYFromId(i) {
+function getXYFromIdx(i) {
   return {
     x: Math.floor(i % COLS),
     y: Math.floor(i / COLS),
   };
 }
 
-function getItemByCoord(x, y) {
-  return items.getChildren().find((item) => item.id === getItemIdFromXY(x, y)); //.iterate('id', getItemIdFromXY(x, y), Phaser.Group.RETURN_CHILD);
+function getItemByXY(x, y) {
+  return itemsGroup.getChildren().find((item) => item.idx === getIdxFromXY(x, y)); //.iterate('id', getIdxFromXY(x, y), Phaser.Group.RETURN_CHILD);
 }
 
 function getMatchesAtPosition(x, y, color, opt_results) {
   results = opt_results || [];
   for (let i = Math.max(x - 1, 0); i <= Math.min(x + 1, COLS - 1); i++) {
     if (i !== x) {
-      let item = getItemByCoord(i, y);
-      if (color === getItemColor(item)) {
-        if (!results.includes(item.id)) {
-          results.push(item.id);
+      let item = getItemByXY(i, y);
+      if (color === getItemType(item)) {
+        if (!results.includes(item.idx)) {
+          results.push(item.idx);
           results = getMatchesAtPosition(i, y, color, results);
         } 
       }
@@ -512,10 +435,10 @@ function getMatchesAtPosition(x, y, color, opt_results) {
   }
   for (let j = Math.max(y - 1, 0); j <= Math.min(y + 1, COLS - 1); j++) {
     if (j !== y) {
-      let item = getItemByCoord(x, j);
-      if (color === getItemColor(item)) { 
-        if (!results.includes(item.id)) {
-          results.push(item.id);
+      let item = getItemByXY(x, j);
+      if (color === getItemType(item)) { 
+        if (!results.includes(item.idx)) {
+          results.push(item.idx);
           results = getMatchesAtPosition(x, j, color, results);
         }
       }
